@@ -1,58 +1,117 @@
 ; ========== AutoHotkey Script Configuration ==========
-; 使用 AutoHotkey v2.0+ 编写
-#SingleInstance Force  ; 如果脚本已运行，则替换它。
-SendMode "Input"       ; 提高 Send 命令的可靠性和速度。
-SetWorkingDir A_ScriptDir  ; 设置脚本的工作目录。
-CoordMode "ToolTip", "Screen"  ; 将工具提示坐标设置为相对于屏幕。
+#SingleInstance Force
+SendMode "Input"
+SetWorkingDir A_ScriptDir
+CoordMode "ToolTip", "Screen"
 
 ; ========== Site Configuration ==========
-; 定义网站名称和对应的 URL
-siteName1 := "Google"
-siteName2 := "GitHub"
-siteName3 := "YouTube"
-siteName4 := "知乎"
-siteName5 := "Bilibili"
+sites := [
+    {name: "🔍 Google",    url: "https://www.google.com"},
+    {name: "🐱 GitHub",    url: "https://github.com"},
+    {name: "▶️ YouTube",   url: "https://www.youtube.com"},
+    {name: "❓ 知乎",      url: "https://www.zhihu.com"},
+    {name: "🎬 Bilibili",  url: "https://www.bilibili.com"}
+]
 
-siteUrl1 := "https://www.google.com"
-siteUrl2 := "https://github.com"
-siteUrl3 := "https://www.youtube.com"
-siteUrl4 := "https://www.zhihu.com"
-siteUrl5 := "https://www.bilibili.com"
+tools := [
+    {name: "📋 记事本",    cmd: "notepad.exe"},
+    {name: "🧮 计算器",    cmd: "calc.exe"},
+    {name: "📸 截图工具",  cmd: "SnippingTool.exe"}
+]
 
-; ========== Main Script Logic ==========
-; 当按下鼠标中键 (MButton) 时触发
-MButton::
+; ========== 创建主菜单 ==========
+MainMenu := Menu()
+
+for site in sites
 {
-    ; 构建菜单
-    myMenu := Menu()
-    myMenu.Add(siteName1, OpenUrl)
-    myMenu.Add(siteName2, OpenUrl)
-    myMenu.Add(siteName3, OpenUrl)
-    myMenu.Add(siteName4, OpenUrl)
-    myMenu.Add(siteName5, OpenUrl)
-    
-    ; 显示菜单在鼠标当前位置
-    MouseGetPos(&mouseX, &mouseY)
-    myMenu.Show(mouseX, mouseY)
-    
-    ; 菜单关闭后，清理菜单
-    myMenu.Delete()
+    currentUrl := site.url
+    currentName := site.name
+    MainMenu.Add(currentName, (*) => Run(currentUrl))
 }
-return
 
-; ========== Functions ==========
-; 统一处理菜单项点击事件的函数
-OpenUrl(ItemName, ItemPos, MyMenu)
+MainMenu.Add()
+
+ToolsMenu := Menu()
+for tool in tools
 {
-    ; 循环查找与菜单项名称匹配的 URL
-    Loop 5
+    currentCmd := tool.cmd
+    currentName := tool.name
+    ToolsMenu.Add(currentName, (*) => Run(currentCmd))
+}
+
+MainMenu.Add("🛠️ 常用工具", ToolsMenu)
+
+MainMenu.Add()
+
+MainMenu.Add("🔄 刷新脚本", (*) => ReloadScript())
+MainMenu.Add("❌ 退出脚本", (*) => ExitApp())
+
+; ========== 热键设置 ==========
+global g_RButtonPressed := false
+global g_RButtonStartX := 0
+global g_RButtonStartY := 0
+
+~RButton::
+{
+    global g_RButtonPressed, g_RButtonStartX, g_RButtonStartY
+    MouseGetPos(&g_RButtonStartX, &g_RButtonStartY)
+    g_RButtonPressed := true
+}
+
+~RButton Up::
+{
+    global g_RButtonPressed, g_RButtonStartX, g_RButtonStartY
+    if (!g_RButtonPressed)
+        return
+
+    g_RButtonPressed := false
+    MouseGetPos(&endX, &endY)
+
+    threshold := 30
+    if (endY - g_RButtonStartY >= threshold)
     {
-        currentNameVar := "siteName" . A_Index
-        if (%currentNameVar% == ItemName)
-        {
-            currentUrlVar := "siteUrl" . A_Index
-            Run(%currentUrlVar%)  ; 打开URL
-            break  ; 找到并执行后，退出循环
-        }
+        MainMenu.Show(g_RButtonStartX, g_RButtonStartY)
     }
 }
+
+^!m::
+{
+    MainMenu.Show()
+}
+
+; ========== 函数定义 ==========
+ReloadScript()
+{
+    try
+    {
+        Reload()
+        Sleep 1000
+        if !WinExist("ahk_class AutoHotkey")
+        {
+            ToolTip("脚本重新加载失败", 100, 100)
+            SetTimer(() => ToolTip(), -2000)
+        }
+    }
+    catch as err
+    {
+        MsgBox("重新加载失败: " err.Message, "错误", "IconX")
+    }
+}
+
+ExitApp()
+{
+    ExitApp()
+}
+
+; ========== 工具提示说明 ==========
+ToolTip("✨ 网站快捷菜单已启动！`n按鼠标右键下滑打开菜单", 100, 100)
+SetTimer(() => ToolTip(), -3000)
+
+; ========== 托盘菜单 ==========
+A_TrayMenu.Delete()
+A_TrayMenu.Add("📂 打开菜单", (*) => MainMenu.Show())
+A_TrayMenu.Add()
+A_TrayMenu.Add("🔄 重新加载脚本", (*) => ReloadScript())
+A_TrayMenu.Add("❌ 退出", (*) => ExitApp())
+
+A_IconTip := "网站快捷菜单`n按鼠标右键下滑打开"
